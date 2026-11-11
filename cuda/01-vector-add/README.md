@@ -16,3 +16,11 @@ Run the exercise:
 ```bash
 ./build/vector_add
 ```
+
+Or run the registered test on a machine with a CUDA-capable GPU:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+GitHub Actions builds the exercise, but its standard runner has no GPU and does not run this test.
