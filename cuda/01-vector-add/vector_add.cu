@@ -31,32 +31,63 @@ int main() {
     std::vector<float> result(n);
 
     float* deviceA = nullptr;
-    cudaError_t statusA = cudaMalloc(&deviceA, n * sizeof(float));
-    if (statusA != cudaSuccess) {
-        std::cerr << "cudaMalloc failed: " << cudaGetErrorString(statusA) << "\n";
+    cudaError_t allocStatusA = cudaMalloc(&deviceA, n * sizeof(float));
+    if (allocStatusA != cudaSuccess) {
+        std::cerr << "cudaMalloc failed: " << cudaGetErrorString(allocStatusA) << "\n";
         return 1;
     }
-    cudaMemcpy(deviceA, a.data(), n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaError_t copyStatusA = cudaMemcpy(deviceA, a.data(), n * sizeof(float), cudaMemcpyHostToDevice);
+    if (copyStatusA != cudaSuccess) {
+        std::cerr << "cudaMemcpy failed: " << cudaGetErrorString(copyStatusA) << "\n";
+        cudaFree(deviceA);
+        return 1;
+    }
     
     float* deviceB = nullptr;
-    cudaError_t statusB = cudaMalloc(&deviceB, n * sizeof(float));
-    if (statusB != cudaSuccess) {
-        std::cerr << "cudaMalloc failed: " << cudaGetErrorString(statusB) << "\n";
+    cudaError_t allocStatusB = cudaMalloc(&deviceB, n * sizeof(float));
+    if (allocStatusB != cudaSuccess) {
+        std::cerr << "cudaMalloc failed: " << cudaGetErrorString(allocStatusB) << "\n";
+        cudaFree(deviceA);
         return 1;
     }
-    cudaMemcpy(deviceB, b.data(), n * sizeof(float), cudaMemcpyHostToDevice);
+    cudaError_t copyStatusB = cudaMemcpy(deviceB, b.data(), n * sizeof(float), cudaMemcpyHostToDevice);
+    if (copyStatusB != cudaSuccess) {
+        std::cerr << "cudaMemcpy failed: " << cudaGetErrorString(copyStatusB) << "\n";
+        cudaFree(deviceA);
+        cudaFree(deviceB);
+        return 1;
+    }
     
     float* deviceResult = nullptr;
-    cudaError_t statusResult = cudaMalloc(&deviceResult, n * sizeof(float));
-    if (statusResult != cudaSuccess) {
-        std::cerr << "cudaMalloc failed: " << cudaGetErrorString(statusResult) << "\n";
+    cudaError_t allocStatusResult = cudaMalloc(&deviceResult, n * sizeof(float));
+    if (allocStatusResult != cudaSuccess) {
+        std::cerr << "cudaMalloc failed: " << cudaGetErrorString(allocStatusResult) << "\n";
+        cudaFree(deviceA);
+        cudaFree(deviceB);
         return 1;
     }
 
     constexpr int threads = 256;
     constexpr int blocks = (n + threads - 1) / threads;
     vectorAdd<<<blocks, threads>>>(deviceA, deviceB, deviceResult, n);
-    cudaMemcpy(result.data(), deviceResult, n * sizeof(float), cudaMemcpyDeviceToHost);
+
+    cudaError_t launchStatus = cudaGetLastError();
+    if (launchStatus != cudaSuccess) {
+        std::cerr << "vectorAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
+        cudaFree(deviceA);
+        cudaFree(deviceB);
+        cudaFree(deviceResult);
+        return 1;
+    }
+
+    cudaError_t copyStatusResult =  cudaMemcpy(result.data(), deviceResult, n * sizeof(float), cudaMemcpyDeviceToHost);
+    if (copyStatusResult != cudaSuccess) {
+        std::cerr << "cudaMemcpy failed: " << cudaGetErrorString(copyStatusResult) << "\n";
+        cudaFree(deviceA);
+        cudaFree(deviceB);
+        cudaFree(deviceResult);
+        return 1;
+    }
 
     cudaFree(deviceA);
     cudaFree(deviceB);
