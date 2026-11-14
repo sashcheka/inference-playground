@@ -70,7 +70,6 @@ int main() {
     constexpr int threads = 256;
     constexpr int blocks = (n + threads - 1) / threads;
     vectorAdd<<<blocks, threads>>>(deviceA, deviceB, deviceResult, n);
-
     cudaError_t launchStatus = cudaGetLastError();
     if (launchStatus != cudaSuccess) {
         std::cerr << "vectorAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
@@ -79,6 +78,33 @@ int main() {
         cudaFree(deviceResult);
         return 1;
     }
+
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+    for (int epoch = 0; epoch < 100; epoch++) {
+        vectorAdd<<<blocks, threads>>>(deviceA, deviceB, deviceResult, n);
+        launchStatus = cudaGetLastError();
+        if (launchStatus != cudaSuccess) {
+            std::cerr << "vectorAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
+            cudaFree(deviceA);
+            cudaFree(deviceB);
+            cudaFree(deviceResult);
+            return 1;
+        }
+    }
+    cudaEventRecord(stop);
+
+    cudaEventSynchronize(stop);
+    float elapsedMs = 0.0f;
+    cudaEventElapsedTime(&elapsedMs, start, stop);
+    std::cout << "vectorAdd kernel total elapsedTime: " << elapsedMs << "ms" << "\n";
+    std::cout << "vectorAdd kernel average elapsedTime: " << elapsedMs / 100 << "ms" << "\n";
+
+    cudaEventDestroy(start);
+    cudaEventDestroy(stop);
 
     cudaError_t copyStatusResult =  cudaMemcpy(result.data(), deviceResult, n * sizeof(float), cudaMemcpyDeviceToHost);
     if (copyStatusResult != cudaSuccess) {
