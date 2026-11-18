@@ -13,12 +13,12 @@ DeviceBuffer::DeviceBuffer(std::size_t count, std::string id) : id_(id) {
         std::cerr << "cudaMalloc failed: " << cudaGetErrorString(allocStatus) << "\n";
         throw std::runtime_error(cudaGetErrorString(allocStatus));
     }
-    std::cout << id_ << " has constructed" << "\n";
+    // std::cout << id_ << " has constructed" << "\n";
 }
 
 DeviceBuffer::~DeviceBuffer() {
     cudaFree(ptr_);
-    std::cout << id_ << " has destoyed" << "\n";
+    // std::cout << id_ << " has destoyed" << "\n";
 }
 
 float* DeviceBuffer::data() const {

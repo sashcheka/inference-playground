@@ -39,9 +39,17 @@ __global__ void matrixAdd(
 }
 
 int main() {
-    constexpr std::size_t height = 3;
-    constexpr std::size_t width = 5;
+    constexpr std::size_t height = 8193;
+    constexpr std::size_t width = 17;
     constexpr std::size_t n = height * width;
+
+    // constexpr dim3 threads(32, 8);
+    // constexpr dim3 threads(16, 16);
+    constexpr dim3 threads(7, 5);
+    constexpr dim3 blocks((width + threads.x - 1) / threads.x, (height + threads.y - 1) / threads.y);
+
+    std::cout << "Threads per block (x, y): " << threads.x << " x " << threads.y << "\n";
+    std::cout << "Grid size (x, y): " << blocks.x << " x " << blocks.y << "\n";
 
     std::vector<float> a(n);
     std::vector<float> b(n);
@@ -55,7 +63,9 @@ int main() {
         DeviceBuffer deviceB(n, "DeviceB");
         DeviceBuffer deviceResult(n, "DeviceResult");
 
-        for (int epoch = 0; epoch < 10; epoch++) {
+        constexpr int repeats = 1;
+        std::chrono::duration<double, std::milli> totalDuration{};
+        for (int epoch = 0; epoch < repeats; epoch++) {
             auto cpuStart = std::chrono::steady_clock::now();
 
             cudaError_t copyStatusA = cudaMemcpy(deviceA.data(), a.data(), n * sizeof(float), cudaMemcpyHostToDevice);
@@ -70,23 +80,54 @@ int main() {
                 return 1;
             }
 
-            constexpr dim3 threads(4, 2);
-            constexpr dim3 blocks((width + threads.x - 1) / threads.x, (height + threads.y - 1) / threads.y);
-
             matrixAdd<<<blocks, threads>>>(deviceA.data(), deviceB.data(), deviceResult.data(), height, width);
-            cudaError_t launchStatus = cudaGetLastError();
-            if (launchStatus != cudaSuccess) {
-                std::cerr << "matrixAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
+            cudaError_t warmupStatus = cudaGetLastError();
+            if (warmupStatus != cudaSuccess) {
+                std::cerr << "matrixAdd failed: " << cudaGetErrorString(warmupStatus) << "\n";
                 return 1;
             }
+
+            cudaEvent_t start, stop;
+            cudaEventCreate(&start);
+            cudaEventCreate(&stop);
+
+            cudaEventRecord(start);
+            constexpr int runs = 100;
+            for (int run = 0; run < runs; run++) {
+                matrixAdd<<<blocks, threads>>>(deviceA.data(), deviceB.data(), deviceResult.data(), height, width);
+                cudaError_t launchStatus = cudaGetLastError();
+                if (launchStatus != cudaSuccess) {
+                    std::cerr << "matrixAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
+                    return 1;
+                }
+            }
+
+            cudaEventRecord(stop);
+            cudaError_t syncStatus  = cudaEventSynchronize(stop);
+            if (syncStatus  != cudaSuccess) {
+                std::cerr << "cudaEventSynchronize failed: " << cudaGetErrorString(syncStatus ) << "\n";
+                return 1;
+            }
+
+            float elapsedMs = 0.0f;
+            cudaError_t elapsedStatus  = cudaEventElapsedTime(&elapsedMs, start, stop);
+            if (elapsedStatus  != cudaSuccess) {
+                std::cerr << "cudaEventElapsedTime failed: " << cudaGetErrorString(elapsedStatus ) << "\n";
+                return 1;
+            }
+            std::cout << "Kernel total: " << elapsedMs << "ms" << "\n";
+            std::cout << "Kernel average: " << elapsedMs / runs << "ms" << "\n";
+
+            cudaEventDestroy(start);
+            cudaEventDestroy(stop);
 
             // constexpr int threads = 256;
             // constexpr int blocks = (n + threads - 1) / threads;
 
             // vectorAdd<<<blocks, threads>>>(deviceA.data(), deviceB.data(), deviceResult.data(), n);
-            // cudaError_t launchStatus = cudaGetLastError();
-            // if (launchStatus != cudaSuccess) {
-            //     std::cerr << "vectorAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
+            // cudaError_t warmupStatus = cudaGetLastError();
+            // if (warmupStatus != cudaSuccess) {
+            //     std::cerr << "vectorAdd failed: " << cudaGetErrorString(warmupStatus) << "\n";
             //     return 1;
             // }
 
@@ -121,9 +162,13 @@ int main() {
             }
 
             auto cpuStop = std::chrono::steady_clock::now();
+            totalDuration += cpuStop - cpuStart;
             std::chrono::duration<double, std::milli> elapsed = cpuStop - cpuStart;
             std::cout << "CPU + GPU elapsed time: " << elapsed.count() << "\n";
         }
+
+        std::cout << "Total total: " << totalDuration.count() << "ms" << "\n";
+        std::cout << "Total average: " << (totalDuration/ repeats).count() << "ms" << "\n";
 
         for (std::size_t i = 0; i < n; ++i) {
             if (a[i] + b[i] != result[i]) {
