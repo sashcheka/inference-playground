@@ -17,3 +17,10 @@ set_target_properties(elementwise_add PROPERTIES
 )
 
 add_test(NAME elementwise_add COMMAND elementwise_add)
+
+add_executable(memory_coalescing cuda/memory-coalescing/memory_coalescing.cu)
+set_target_properties(memory_coalescing PROPERTIES
+    CUDA_STANDARD 17
+    CUDA_STANDARD_REQUIRED ON
+    CUDA_ARCHITECTURES 75
+)
