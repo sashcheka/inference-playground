@@ -44,8 +44,8 @@ int main() {
     constexpr std::size_t n = height * width;
 
     // constexpr dim3 threads(32, 8);
-    // constexpr dim3 threads(16, 16);
-    constexpr dim3 threads(7, 5);
+    constexpr dim3 threads(16, 16);
+    // constexpr dim3 threads(7, 5);
     constexpr dim3 blocks((width + threads.x - 1) / threads.x, (height + threads.y - 1) / threads.y);
 
     std::cout << "Threads per block (x, y): " << threads.x << " x " << threads.y << "\n";
