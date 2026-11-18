@@ -22,8 +22,26 @@ __global__ void vectorAdd(
     return;
 }
 
+__global__ void matrixAdd(
+    const float* const a,
+    const float* const b,
+    float* const result,
+    std::size_t height,
+    std::size_t width
+) {
+    std::size_t r = blockIdx.y * blockDim.y + threadIdx.y;
+    std::size_t c = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (r < height && c < width) {
+        std::size_t i = r * width + c;
+        result[i] = a[i] + b[i];
+    }
+}
+
 int main() {
-    constexpr std::size_t n = 1'000'000;
+    constexpr std::size_t height = 3;
+    constexpr std::size_t width = 5;
+    constexpr std::size_t n = height * width;
 
     std::vector<float> a(n);
     std::vector<float> b(n);
@@ -52,16 +70,25 @@ int main() {
                 return 1;
             }
 
-            constexpr int threads = 256;
-            constexpr int blocks = (n + threads - 1) / threads;
+            constexpr dim3 threads(4, 2);
+            constexpr dim3 blocks((width + threads.x - 1) / threads.x, (height + threads.y - 1) / threads.y);
 
-            vectorAdd<<<blocks, threads>>>(deviceA.data(), deviceB.data(), deviceResult.data(), n);
-
+            matrixAdd<<<blocks, threads>>>(deviceA.data(), deviceB.data(), deviceResult.data(), height, width);
             cudaError_t launchStatus = cudaGetLastError();
             if (launchStatus != cudaSuccess) {
-                std::cerr << "vectorAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
+                std::cerr << "matrixAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
                 return 1;
             }
+
+            // constexpr int threads = 256;
+            // constexpr int blocks = (n + threads - 1) / threads;
+
+            // vectorAdd<<<blocks, threads>>>(deviceA.data(), deviceB.data(), deviceResult.data(), n);
+            // cudaError_t launchStatus = cudaGetLastError();
+            // if (launchStatus != cudaSuccess) {
+            //     std::cerr << "vectorAdd failed: " << cudaGetErrorString(launchStatus) << "\n";
+            //     return 1;
+            // }
 
             // cudaEvent_t start, stop;
             // cudaEventCreate(&start);

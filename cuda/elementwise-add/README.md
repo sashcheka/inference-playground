@@ -1,8 +1,8 @@
-# Vector addition
+# Elementwise addition
 
-Write a CUDA kernel that adds two arrays element by element. Then launch it from the CPU and check the result.
+Add two inputs element by element on the GPU and verify the result on the CPU. The source includes a 1D vector kernel and a 2D matrix kernel. The executable runs the matrix version.
 
-Start with 1,000 `float` elements and 256 threads per block. Make sure threads outside the array bounds do not access memory.
+The matrix uses a contiguous buffer. Threads outside its row or column bounds skip the write.
 
 From the repository root, configure once and build:
 
@@ -14,7 +14,7 @@ cmake --build build
 Run the exercise:
 
 ```bash
-./build/vector_add
+./build/elementwise_add
 ```
 
 Or run the registered test on a machine with a CUDA-capable GPU:
